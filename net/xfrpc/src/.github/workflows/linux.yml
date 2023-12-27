@@ -1,0 +1,31 @@
+name: compile xfrpc in ubuntu-latest 
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+    
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: install other depend lib
+      run: |
+          sudo apt-get update -y
+          sudo apt-get install -y libjson-c-dev
+          sudo apt-get install -y libevent-dev
+          
+    - name: compile xfrpc
+      run: |
+        mkdir build
+        cd build
+        cmake ..
+        make

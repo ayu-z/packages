@@ -1,0 +1,116 @@
+#!/bin/sh /etc/rc.common
+
+START=90
+USE_PROCD=1
+CONF_FILE="/var/etc/frp/frpc.conf"
+
+
+start_instance() {
+
+	local cfg="$1"
+	config_get type $cfg TYPE
+	
+	case "$type" in
+	frp)
+		config_get enabled "$cfg" 'enabled' 
+		[ "$enabled" = "0" ] && return 1
+		local server_addr server_port token 
+		config_get server_addr $cfg server_addr
+		config_get server_port $cfg server_port
+		config_get token $cfg token
+		config_get time $cfg time
+		
+		mkdir -p /var/etc/frp
+		echo "[common]" > $CONF_FILE
+		echo "server_addr=$server_addr"	>> $CONF_FILE
+		echo "server_port=$server_port"	>> $CONF_FILE
+		echo "token=$token" >> $CONF_FILE
+		Enabled=$enabled
+	;;
+	proxy)
+		local remark type subdomain remote_port local_ip local_port enable custom_domains
+		config_get_bool enable $cfg enable 0
+		config_get remark $cfg remark
+		[ "$enable" = "0" ] && return 1
+		config_get type $cfg type
+		config_get custom_domains $cfg custom_domains
+		config_get remote_port $cfg remote_port
+		config_get local_ip $cfg local_ip
+		config_get local_port $cfg local_port
+		config_get use_encryption $cfg use_encryption 
+		config_get use_compression $cfg use_compression 
+		
+		[ -n "$remark" ] && [ -n "$type" ] || return 1
+		echo "" >> $CONF_FILE
+	        echo "[$remark]" >> $CONF_FILE
+	        echo "type=$type" >> $CONF_FILE
+	        [ "$type" = "http" ] && echo "custom_domains=$custom_domains" >> $CONF_FILE
+	        [ "$type" = "tcp" ] && echo "remote_port=$remote_port" >> $CONF_FILE
+	        echo "local_ip=$local_ip" >> $CONF_FILE
+	        echo "local_port=$local_port" >> $CONF_FILE
+	;;
+	esac
+}
+
+stop_instance() {
+	local cfg="$1"
+	killall -9 xfrpc
+}
+
+
+start_service() {
+	config_load frp
+	config_foreach start_instance frp
+	config_foreach start_instance proxy
+	if [ "$Enabled" = "1" ];then
+ 		procd_open_instance
+                procd_set_param command /usr/bin/xfrpc -c $CONF_FILE
+                procd_set_param stdout 1
+                procd_set_param stderr 1
+                procd_close_instance
+		[ "$time" -gt 0 ] && frp_add_cru $time	
+	echo start
+	fi		
+}
+
+
+stop_service() {
+	frp_del_cru
+	config_load frp
+	killall -9 xfrpc
+	rm /var/etc/frp -rf 
+}
+
+
+service_triggers() {
+	procd_add_reload_trigger "frp"
+}
+
+
+frp_add_cru(){
+	local time=$1
+	if [ ! -f "/etc/crontabs/root" ] || [ -z "$(cat /etc/crontabs/root | grep frp)" ]; then
+  		sed -i '/frp/d' /etc/crontabs/root >/dev/null 2>&1
+  		echo "*/$time * * * * /etc/init.d/frp restart" >> /etc/crontabs/root 
+	fi
+
+}
+
+frp_del_cru(){
+	if [ ! -f "/etc/crontabs/root" ] || [ -n "$(cat /etc/crontabs/root | grep frp)" ]; then
+  	sed -i '/frp/d' /etc/crontabs/root >/dev/null 2>&1
+fi
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
