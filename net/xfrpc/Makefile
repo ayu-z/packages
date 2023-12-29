@@ -54,15 +54,15 @@ endef
 define Package/xfrpc/install
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) $(CMAKE_BUILD_DIR)/xfrpc $(1)/usr/bin/
-	# $(INSTALL_DIR) $(1)/etc/init.d
-	# $(INSTALL_BIN) ./files/xfrpc.init $(1)/etc/init.d/xfrpc
-	# $(INSTALL_DIR) $(1)/etc/config
-	# $(CP) ./files/xfrpc.conf $(1)/etc/config/xfrpc
-
 	$(INSTALL_DIR) $(1)/etc/init.d
-	$(INSTALL_BIN) ./files/frp.init $(1)/etc/init.d/frp
+	$(INSTALL_BIN) ./files/xfrpc.init $(1)/etc/init.d/xfrpc
 	$(INSTALL_DIR) $(1)/etc/config
-	$(CP) ./files/frp.conf $(1)/etc/config/frp
+	$(CP) ./files/xfrpc.conf $(1)/etc/config/xfrpc
+
+	# $(INSTALL_DIR) $(1)/etc/init.d
+	# $(INSTALL_BIN) ./files/frp.init $(1)/etc/init.d/frp
+	# $(INSTALL_DIR) $(1)/etc/config
+	# $(CP) ./files/frp.conf $(1)/etc/config/frp
 endef
 
 $(eval $(call BuildPackage,xfrpc))
