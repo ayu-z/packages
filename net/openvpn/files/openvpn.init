@@ -42,25 +42,9 @@ append_params() {
 		config_get v "$s" "$p"
 		IFS="$LIST_SEP"
 		for v in $v; do
-			[ "$v" = "frames_only" ] && [ "$p" = "compress" ] && unset v && append_param "$s" "$p" && echo >> "/var/etc/openvpn-$s.conf"
-			[ -n "$v" ] && [ "$p" != "push" ] && append_param "$s" "$p" && echo " $v" >> "/var/etc/openvpn-$s.conf"
-			[ -n "$v" ] && [ "$p" = "push" ] && append_param "$s" "$p" && echo " \"$v\"" >> "/var/etc/openvpn-$s.conf"
+			[ -n "$v" ] && append_param "$s" "$p" && echo " $v" >> "/var/etc/openvpn-$s.conf"
 		done
 		unset IFS
-	done
-}
-
-append_list() {
-	local p; local v; local s="$1"; shift
-
-	list_cb_append() {
-		v="${v}:$1"
-	}
-
-	for p in $*; do
-		unset v
-		config_list_foreach "$s" "$p" list_cb_append
-		[ -n "$v" ] && append_param "$s" "$p" && echo " ${v:1}" >> "/var/etc/openvpn-$s.conf"
 	done
 }
 
@@ -70,100 +54,24 @@ section_enabled() {
 	[ $enable -gt 0 ] || [ $enabled -gt 0 ]
 }
 
-create_temp_file() {
-	mkdir -p "$(dirname "$1")"
-	rm -f "$1"
-	touch "$1"
-	chown root "$1"
-	chmod 0600 "$1"
-}
-
-openvpn_get_dev() {
-	local dev dev_type
-	local name="$1"
-	local conf="$2"
-
-	# Do override only for configurations with config_file
-	config_get config_file "$name" config
-	[ -n "$config_file" ] || return
-
-	# Check there is someething to override
-	config_get dev "$name" dev
-	config_get dev_type "$name" dev_type
-	[ -n "$dev" ] || return
-
-	# If there is a no dev_type, try to guess it
-	if [ -z "$dev_type" ]; then
-		. /lib/functions/openvpn.sh
-
-		local odev odev_type
-		get_openvpn_option "$conf" odev dev
-		get_openvpn_option "$conf" odev_type dev-type
-		[ -n "$odev_type" ] || odev_type="$odev"
-
-		case "$odev_type" in
-			tun*) dev_type="tun" ;;
-			tap*) dev_type="tap" ;;
-			*) return;;
-		esac
-	fi
-
-	# Return overrides
-	echo "--dev-type $dev_type --dev $dev"
-}
-
-openvpn_get_credentials() {
-	local name="$1"
-	local ret=""
-
-	config_get cert_password "$name" cert_password
-	config_get password "$name" password
-	config_get username "$name" username
-
-	if [ -n "$cert_password" ]; then
-		create_temp_file /var/run/openvpn.$name.pass
-		echo "$cert_password" > /var/run/openvpn.$name.pass
-		ret=" --askpass /var/run/openvpn.$name.pass "
-	fi
-
-	if [ -n "$username" ]; then
-		create_temp_file /var/run/openvpn.$name.userpass
-		echo "$username" > /var/run/openvpn.$name.userpass
-		echo "$password" >> /var/run/openvpn.$name.userpass
-		ret=" --auth-user-pass /var/run/openvpn.$name.userpass "
-	fi
-
-	# Return overrides
-	echo "$ret"
-}
-
 openvpn_add_instance() {
 	local name="$1"
 	local dir="$2"
 	local conf="$3"
-	local security="$4"
-	local up="$5"
-	local down="$6"
 
-	procd_open_instance "$name"
+if uci get openvpn.sample_client.fullconfig >/dev/null 2>&1;then
+    echo copy config to /var
+	cp `uci get openvpn.sample_client.fullconfig` $dir/$conf
+fi
+
+	procd_open_instance
 	procd_set_param command "$PROG"	\
 		--syslog "openvpn($name)" \
 		--status "/var/run/openvpn.$name.status" \
 		--cd "$dir" \
-		--config "$conf" \
-		--up "/usr/libexec/openvpn-hotplug up $name" \
-		--down "/usr/libexec/openvpn-hotplug down $name" \
-		${up:+--setenv user_up "$up"} \
-		${down:+--setenv user_down "$down"} \
-		--script-security "${security:-2}" \
-		$(openvpn_get_dev "$name" "$conf") \
-		$(openvpn_get_credentials "$name" "$conf")
+		--config "$conf"
 	procd_set_param file "$dir/$conf"
-	procd_set_param term_timeout 15
 	procd_set_param respawn
-	procd_append_param respawn 3600
-	procd_append_param respawn 5
-	procd_append_param respawn -1
 	procd_close_instance
 }
 
@@ -178,77 +86,74 @@ start_instance() {
 		return 1
 	}
 
-	local up down script_security
-	config_get up "$s" up
-	config_get down "$s" down
-	config_get script_security "$s" script_security
-
 	[ ! -d "/var/run" ] && mkdir -p "/var/run"
 
 	if [ ! -z "$config" ]; then
 		append UCI_STARTED "$config" "$LIST_SEP"
-		[ -n "$up" ] || get_openvpn_option "$config" up up
-		[ -n "$down" ] || get_openvpn_option "$config" down down
-		openvpn_add_instance "$s" "${config%/*}" "$config" "$script_security" "$up" "$down"
+		openvpn_add_instance "$s" "${config%/*}" "$config"
 		return
 	fi
 
-	create_temp_file "/var/etc/openvpn-$s.conf"
+	[ ! -d "/var/etc" ] && mkdir -p "/var/etc"
+	[ -f "/var/etc/openvpn-$s.conf" ] && rm "/var/etc/openvpn-$s.conf"
 
-	append_bools "$s" $OPENVPN_BOOLS
-	append_params "$s" $OPENVPN_PARAMS
-	append_list "$s" $OPENVPN_LIST
+	# append flags
+	append_bools "$s" \
+		auth_nocache auth_user_pass_optional bind ccd_exclusive client client_cert_not_required \
+		client_to_client comp_noadapt disable \
+		disable_occ down_pre duplicate_cn fast_io float http_proxy_retry \
+		ifconfig_noexec ifconfig_nowarn ifconfig_pool_linear management_forget_disconnect management_hold \
+		management_query_passwords management_signal mktun mlock mtu_test multihome mute_replay_warnings \
+		nobind no_iv no_name_remapping no_replay opt_verify passtos persist_key persist_local_ip \
+		persist_remote_ip persist_tun ping_timer_rem pull push_reset \
+		remote_random rmtun route_noexec route_nopull single_session socks_proxy_retry \
+		suppress_timestamps tcp_nodelay test_crypto tls_client tls_exit tls_server \
+		tun_ipv6 up_delay up_restart username_as_common_name
 
-	openvpn_add_instance "$s" "/var/etc" "openvpn-$s.conf" "$script_security" "$up" "$down"
+	# append params
+	append_params "$s" \
+		cd askpass auth auth_retry auth_user_pass auth_user_pass_verify bcast_buffers ca cert \
+		chroot cipher client_config_dir client_connect client_disconnect comp_lzo connect_freq \
+		connect_retry connect_timeout connect_retry_max crl_verify dev dev_node dev_type dh \
+		echo engine explicit_exit_notify fragment group hand_window hash_size \
+		http_proxy http_proxy_option http_proxy_timeout ifconfig ifconfig_pool \
+		ifconfig_pool_persist ifconfig_push inactive ipchange iroute keepalive \
+		key key_method keysize learn_address link_mtu lladdr local log log_append \
+		lport management management_log_cache max_clients \
+		max_routes_per_client mode mssfix mtu_disc mute nice ns_cert_type ping \
+		ping_exit ping_restart pkcs12 plugin port port_share prng proto rcvbuf \
+		redirect_gateway remap_usr1 remote remote_cert_eku remote_cert_ku remote_cert_tls \
+		reneg_bytes reneg_pkts reneg_sec \
+		replay_persist replay_window resolv_retry route route_delay route_gateway \
+		route_metric route_up rport script_security secret server server_bridge setenv shaper sndbuf \
+		socks_proxy status status_version syslog tcp_queue_limit tls_auth \
+		tls_cipher tls_remote tls_timeout tls_verify tmp_dir topology tran_window \
+		tun_mtu tun_mtu_extra txqueuelen user verb down push up \
+		ifconfig_ipv6 route_ipv6 server_ipv6 ifconfig_ipv6_pool ifconfig_ipv6_push iroute_ipv6
+
+	openvpn_add_instance "$s" "/var/etc" "openvpn-$s.conf"
 }
 
 start_service() {
-	local instance="$1"
-	local instance_found=0
-
-	config_cb() {
-		local type="$1"
-		local name="$2"
-		if [ "$type" = "openvpn" ]; then
-			if [ -n "$instance" -a "$instance" = "$name" ]; then
-				instance_found=1
-			fi
-		fi
-	}
-
-	. /lib/functions/openvpn.sh
-	. /usr/share/openvpn/openvpn.options
 	config_load 'openvpn'
+	config_foreach start_instance 'openvpn'
+	date +%s >/tmp/openvpn.uptime
+	local path name
+	for path in /etc/openvpn/*.conf; do
+		if [ -f "$path" ]; then
+			name="${path##*/}"; name="${name%.conf}"
 
-	if [ -n "$instance" ]; then
-		[ "$instance_found" -gt 0 ] || return
-		start_instance "$instance"
-	else
-		config_foreach start_instance 'openvpn'
+			# don't start configs again that are already started by uci
+			if echo "$UCI_STARTED" | grep -qxF "$path"; then
+				continue
 
-		local path name up down
-		for path in /etc/openvpn/*.conf; do
-			if [ -f "$path" ]; then
-				name="${path##*/}"; name="${name%.conf}"
-
-				# don't start configs again that are already started by uci
-				if echo "$UCI_STARTED" | grep -qxF "$path"; then
-					continue
-
-				# don't start configs which are set to disabled in uci
-				elif echo "$UCI_DISABLED" | grep -qxF "$path"; then
-					logger -t openvpn "$name.conf is disabled in /etc/config/openvpn"
-					continue
-				fi
-
-				get_openvpn_option "$path" up up || up=""
-				get_openvpn_option "$path" down down || down=""
-				openvpn_add_instance "$name" "${path%/*}" "$path" "" "$up" "$down"
+			# don't start configs which are set to disabled in uci
+			elif echo "$UCI_DISABLED" | grep -qxF "$path"; then
+				logger -t openvpn "$name.conf is disabled in /etc/config/openvpn"
+				continue
 			fi
-		done
-	fi
-}
 
-service_triggers() {
-	procd_add_reload_trigger openvpn
+			openvpn_add_instance "$name" "${path%/*}" "$path"
+		fi
+	done
 }
