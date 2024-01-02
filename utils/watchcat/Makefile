@@ -9,7 +9,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=watchcat
 PKG_VERSION:=1
-PKG_RELEASE:=12
+PKG_RELEASE:=17
 
 PKG_MAINTAINER:=Roger D <rogerdammit@gmail.com>
 PKG_LICENSE:=GPL-2.0
@@ -39,6 +39,8 @@ define Package/watchcat/install
 	$(INSTALL_BIN) ./files/watchcat.init $(1)/etc/init.d/watchcat
 	$(INSTALL_DIR) $(1)/usr/bin
 	$(INSTALL_BIN) ./files/watchcat.sh $(1)/usr/bin/watchcat.sh
+	$(INSTALL_DIR) $(1)/sbin
+	$(INSTALL_BIN) ./files/watchcat.user.sh $(1)/sbin/watchcat.user.sh
 	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_DATA) ./files/watchcat.config $(1)/etc/config/watchcat
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
