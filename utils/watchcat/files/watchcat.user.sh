@@ -2,14 +2,16 @@
 
 logger 'run watchcat user sh'
 
-
 ATtool=ylx_AT-Tool
 switch=$(uci get watchcat.@watchcat[0].simslot)
 vidpid=`cat /sys/kernel/debug/usb/devices |grep Vendor |grep -v "Vendor=1d6b"|head -n 1 |awk  '{print $2  $3}'`
-atDev=$(cat /tmp/modem.json |grep atDev |awk -F':' '{print $2}' |tr -d '"", ')
-simslot=$(cat /tmp/modem.json |grep SimSlot |awk -F':' '{print $2}' |tr -d '"", ')
-[ -z "$simslot"] && simslot='1'
-[ -z "$atDev" ] && logger "Fetch device error" && exit 
+atDev=$(cat /tmp/modem.json | grep atDev | awk -F':' '{print $2}' | tr -d '" ,\t')
+simslot=$(cat /tmp/modem.json |grep SIMSLOT |awk -F':' '{print $2}' | tr -d '" ,\t')
+[ -z "$simslot" ] && simslot='slot 1'
+[ -z "$atDev" ] && {
+    logger "Fetch device error" 
+    exit 
+}
 
 sendCmd(){
     cmd=$1
@@ -19,7 +21,7 @@ sendCmd(){
 if [ "$switch"x == "1"x ]; then
     case $vidpid in
         Vendor=2deeProdID=4d52)
-            if [ "$simslot" == "1" ]; then
+            if [ "$simslot"x == "slot 1"x ]; then
                 sendCmd "AT^SIMSLOT=2"
                 sleep 3
                 simstate=$(sendCmd "at+cpin?"|grep CPIN|cut -d" " -f2|tr -d "\r\n")
@@ -37,7 +39,7 @@ if [ "$switch"x == "1"x ]; then
             fi
         ;;
         Vendor=2c7cProdID=0800)
-            if [ "$simslot" == "1" ]; then
+            if [ "$simslot"x == "slot 1"x ]; then
                 sendCmd "AT+QUIMSLOT=2"
                 sleep 3
                 simstate=$(sendCmd "at+cpin?"|grep CPIN|cut -d" " -f2|tr -d "\r\n")
