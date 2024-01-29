@@ -67,6 +67,8 @@ define Package/n2n/install
 	$(INSTALL_CONF) ./files/n2n.config $(1)/etc/config/n2n
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./files/n2n.init $(1)/etc/init.d/n2n
+	$(INSTALL_DIR) $(1)/user/share/n2n
+	$(INSTALL_BIN) ./files/n2n-watchdog $(1)/user/share/n2n/n2n-watchdog
 	$(INSTALL_DIR) $(1)/etc/uci-defaults
 	$(INSTALL_BIN) ./files/n2n-migrate-conf.sh $(1)/etc/uci-defaults/50-n2n-migrate-conf
 endef

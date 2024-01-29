@@ -45,7 +45,7 @@ config_watchcat() {
 	config_get addressfamily "$1" addressfamily "any"
 	config_get script "$1" script
 
-	if ["$enable" = '0'] ;then
+	if [ "$enable" = '0' ]; then
 		exit 0
 	fi
 	# Fix potential typo in mode and provide backward compatibility.

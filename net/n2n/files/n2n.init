@@ -15,6 +15,7 @@ start_instance() {
 	edge)
 		local enabled
 		config_get_bool enabled "$cfg" 'enabled' '0'
+		Enabled=$enabled
 		[ "$enabled" = "1" ] || return 1
 
 		local masquerade tunname mode ipaddr prefix mtu
@@ -120,6 +121,20 @@ stop_instance() {
 }
 
 start_service() {
+	if [ "$Enabled" = "1" ]; then
+        	super1=`uci get n2n.@edge[0].supernode`
+        	super2=`uci get n2n.@edge[0].second_supernode >/dev/null 2>&1`
+		ping -c 1 -w 3 $super1 >/dev/null 2>&1
+        	r1="$?"
+        	if [ "$r1" != "0" ];then
+			ping -c 1 -w 3 $super2 >/dev/null 2>&1
+        		r1="$?"
+			if [ "$r1" != "0" ];then
+                		/user/share/n2n/n2n-watchdog boot >/dev/nul 2>&1 &
+                		exit 0
+			fi
+        	fi
+	fi
 	config_load 'n2n'
 	config_foreach start_instance 'edge'
 	config_foreach start_instance 'supernode'

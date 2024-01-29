@@ -1,0 +1,39 @@
+#!/bin/sh
+# Copyright (C) 2008-2012 OpenWrt.org
+check=$1
+init()
+{
+	local retry=0
+	while : ; do
+		local isrun=0; local pid
+		for pid in $(pidof "${0##*/}"); do
+			[ $pid -ne $$ ] && isrun=1 && break
+		done
+		[ $isrun -eq 0 ] && break
+		let retry++; [ $retry -gt 5 ] && return 1
+		sleep 2s
+	done
+}
+
+check()
+{
+	super1=`uci get n2n.@edge[0].supernode`
+	super2=`uci get n2n.@edge[0].second_supernode >/dev/null 2>&1`
+	while [ "$check" == "boot" ]; do
+		ping -c 1 -w 3 $super1 >/dev/null 2>&1
+		r1="$?"
+		if [ "$r1" != "0" ];then
+			ping -c 1 -w 3 $super2 >/dev/null 2>&1
+			r1="$?"
+		fi
+		if [ "$r1" != "0" ];then
+			sleep 2
+		else
+			/etc/init.d/n2n restart
+			exit 0
+		fi
+	done
+}
+
+init && check
+exit $?
