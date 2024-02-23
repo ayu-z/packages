@@ -15,7 +15,24 @@ simslot=$(cat /tmp/modem.json |grep SIMSLOT |awk -F':' '{print $2}' | tr -d '" ,
 
 sendCmd(){
     cmd=$1
+    
+    [ $cmd == "AT+CFUN=1,1" ] && {
+        [ ! -f '/tmp/last_time' ] && {
+            echo $(date +%s) > /tmp/last_time
+        }
+        local_time=$(date +%s)
+        last_reboot_time=$(cat /tmp/last_time)
+        interval=$(($local_time - $last_reboot_time))
+        [ "$interval" -lt 120 ] && exit 0
+        echo $local_time > /tmp/last_time
+    }
+
     $ATtool -p "$atDev" -c "$cmd"
+}
+
+[ $(cat /tmp/sysinfo/model) != "M21L2S" ] && {
+    sendCmd "AT+CFUN=1,1"
+    exit 0
 }
 
 if [ "$switch"x == "1"x ]; then
@@ -61,7 +78,6 @@ if [ "$switch"x == "1"x ]; then
             sendCmd "AT+CFUN=1,1"
         ;;
     esac
-    sleep 5
 else
     sendCmd "AT+CFUN=1,1"
 fi
