@@ -1,13 +1,12 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=lua-eco
+PKG_VERSION:=3.5.2
 PKG_RELEASE:=1
 
-PKG_SOURCE_PROTO:=git
-PKG_SOURCE_URL=https://github.com/zhaojh329/lua-eco.git
-PKG_SOURCE_DATE:=2023-11-22
-PKG_SOURCE_VERSION:=50388e3823e832a2198dccb62a0b0e581217b1a5
-PKG_MIRROR_HASH:=de4d8e81fa20d1a2f9fcd5097b4ee245edb9c8d6647c1ec80940dabf6786ee80
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.gz
+PKG_SOURCE_URL=https://github.com/zhaojh329/lua-eco/releases/download/v$(PKG_VERSION)
+PKG_HASH:=5b3e2be94f8f93a60160aa81c6b273314e98502b2f6ad99b51b7901a7016c519
 
 PKG_MAINTAINER:=Jianhui Zhao <zhaojh329@gmail.com>
 PKG_LICENSE:=MIT
@@ -56,7 +55,7 @@ Package/lua-eco-ssl=$(call Package/lua-eco/Module,ssl,\
   +LUA_ECO_MBEDTLS:libmbedtls +LUA_ECO_MBEDTLS:zlib +lua-eco-socket)
 Package/lua-eco-ubus=$(call Package/lua-eco/Module,ubus,+libubus)
 Package/lua-eco-http=$(call Package/lua-eco/Module,http/https,+lua-eco-dns +lua-eco-ssl +lua-eco-base64 +lua-eco-log)
-Package/lua-eco-mqtt=$(call Package/lua-eco/Module,mqtt,+lua-eco-socket +lua-eco-dns +libmosquitto-ssl)
+Package/lua-eco-mqtt=$(call Package/lua-eco/Module,mqtt,+lua-eco-socket +lua-eco-ssl)
 Package/lua-eco-websocket=$(call Package/lua-eco/Module,websocket,+lua-eco-http +lua-eco-base64 +lua-eco-sha1)
 Package/lua-eco-termios=$(call Package/lua-eco/Module,termios)
 Package/lua-eco-netlink=$(call Package/lua-eco/Module,netlink,+lua-eco-socket)
@@ -95,11 +94,14 @@ ifneq ($(CONFIG_PACKAGE_lua-eco-ssl),)
 endif
 
 define Package/lua-eco/install
-	$(INSTALL_DIR) $(1)/usr/bin $(1)/usr/local/lib/lua/5.3/eco/core $(1)/usr/local/lib/lua/5.3/eco/encoding
+	$(INSTALL_DIR) $(1)/usr/bin $(1)/usr/local/lib/lua/5.3/eco/core \
+		$(1)/usr/lib $(1)/usr/local/lib/lua/5.3/eco/encoding
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/eco $(1)/usr/bin
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/libeco.so $(1)/usr/lib
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/bufio.so $(1)/usr/local/lib/lua/5.3/eco
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/hex.lua $(1)/usr/local/lib/lua/5.3/eco/encoding
 	$(INSTALL_BIN) $(PKG_BUILD_DIR)/{time,bufio,sys,file}.so $(1)/usr/local/lib/lua/5.3/eco/core
-	$(INSTALL_DATA) $(PKG_BUILD_DIR)/{time,bufio,sys,file,sync}.lua $(1)/usr/local/lib/lua/5.3/eco
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/{time,sys,file,sync}.lua $(1)/usr/local/lib/lua/5.3/eco
 endef
 
 define Package/lua-eco-log/install
@@ -151,9 +153,8 @@ define Package/lua-eco-http/install
 endef
 
 define Package/lua-eco-mqtt/install
-	$(INSTALL_DIR) $(1)/usr/local/lib/lua/5.3/eco/core
+	$(INSTALL_DIR) $(1)/usr/local/lib/lua/5.3/eco
 	$(INSTALL_DATA) $(PKG_BUILD_DIR)/mqtt.lua $(1)/usr/local/lib/lua/5.3/eco
-	$(INSTALL_BIN) $(PKG_BUILD_DIR)/mqtt.so $(1)/usr/local/lib/lua/5.3/eco/core
 endef
 
 define Package/lua-eco-websocket/install
