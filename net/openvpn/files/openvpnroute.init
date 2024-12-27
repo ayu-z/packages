@@ -40,6 +40,7 @@ start_instance() {
 		ovpn_tun="tap0"
         netmask=`netmask_to_cidr $(uci get network.lan.netmask)`
         lan_subnet=$(uci get network.lan.ipaddr)/${netmask}
+		iptables -F
         iptables -A INPUT -i br-lan -p icmp --icmp-type echo-request -j ACCEPT
         iptables -A FORWARD -i br-lan -o ${ovpn_tun} -j ACCEPT
         iptables -A FORWARD -i ${ovpn_tun} -o br-lan -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
