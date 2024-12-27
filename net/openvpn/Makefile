@@ -9,14 +9,14 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=openvpn
 
-PKG_VERSION:=2.5.8
-PKG_RELEASE:=1
+PKG_VERSION:=2.5.3
+PKG_RELEASE:=4
 
 PKG_SOURCE_URL:=\
 	https://build.openvpn.net/downloads/releases/ \
 	https://swupdate.openvpn.net/community/releases/
 PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.xz
-PKG_HASH:=2bbd0026469902037ee6499b68283d5ab36c74e36cae3112082cfdf6c77a0c57
+PKG_HASH:=fb6a9943c603a1951ca13e9267653f8dd650c02f84bccd2b9d20f06a4c9c9a7e
 
 PKG_MAINTAINER:=Magnus Kroken <mkroken@gmail.com>
 
@@ -42,7 +42,6 @@ endef
 
 Package/openvpn-openssl=$(call Package/openvpn/Default,openssl,OpenSSL,+PACKAGE_openvpn-openssl:libopenssl)
 Package/openvpn-mbedtls=$(call Package/openvpn/Default,mbedtls,mbedTLS,+PACKAGE_openvpn-mbedtls:libmbedtls)
-Package/openvpn-wolfssl=$(call Package/openvpn/Default,wolfssl,WolfSSL \(experimental\),+PACKAGE_openvpn-wolfssl:libwolfssl)
 
 define Package/openvpn/config/Default
 	source "$(SOURCE)/Config-$(1).in"
@@ -50,16 +49,12 @@ endef
 
 Package/openvpn-openssl/config=$(call Package/openvpn/config/Default,openssl)
 Package/openvpn-mbedtls/config=$(call Package/openvpn/config/Default,mbedtls)
-Package/openvpn-wolfssl/config=$(call Package/openvpn/config/Default,wolfssl)
 
 ifeq ($(BUILD_VARIANT),mbedtls)
 CONFIG_OPENVPN_MBEDTLS:=y
 endif
 ifeq ($(BUILD_VARIANT),openssl)
 CONFIG_OPENVPN_OPENSSL:=y
-endif
-ifeq ($(BUILD_VARIANT),wolfssl)
-CONFIG_OPENVPN_WOLFSSL:=y
 endif
 
 CONFIGURE_VARS += \
@@ -87,9 +82,8 @@ define Build/Configure
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_DEF_AUTH),--enable,--disable)-def-auth \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_PF),--enable,--disable)-pf \
 		$(if $(CONFIG_OPENVPN_$(BUILD_VARIANT)_ENABLE_PORT_SHARE),--enable,--disable)-port-share \
-		$(if $(CONFIG_OPENVPN_OPENSSL),--with-crypto-library=openssl --with-openssl-engine=no) \
+		$(if $(CONFIG_OPENVPN_OPENSSL),--with-crypto-library=openssl) \
 		$(if $(CONFIG_OPENVPN_MBEDTLS),--with-crypto-library=mbedtls) \
-		$(if $(CONFIG_OPENVPN_WOLFSSL),--with-crypto-library=wolfssl) \
 	)
 endef
 
@@ -117,6 +111,12 @@ define Package/openvpn-$(BUILD_VARIANT)/install
 	$(INSTALL_BIN) \
 		files/openvpn.init \
 		$(1)/etc/init.d/openvpn
+	$(INSTALL_BIN) \
+		files/openvpnroute.init \
+		$(1)/etc/init.d/openvpnroute
+	$(INSTALL_BIN) \
+		files/openvpn.sh \
+		$(1)/usr/share/openvpn.sh
 
 	$(INSTALL_BIN) \
 		files/usr/libexec/openvpn-hotplug \
@@ -140,6 +140,8 @@ define Package/openvpn-$(BUILD_VARIANT)/install
 
 	$(INSTALL_CONF) files/openvpn.config \
 		$(1)/etc/config/openvpn
+	$(INSTALL_CONF) files/openvpnroute.config \
+		$(1)/etc/config/openvpnroute
 
 	$(INSTALL_DATA) \
 		files/openvpn.upgrade \
@@ -148,4 +150,3 @@ endef
 
 $(eval $(call BuildPackage,openvpn-openssl))
 $(eval $(call BuildPackage,openvpn-mbedtls))
-$(eval $(call BuildPackage,openvpn-wolfssl))

@@ -1,0 +1,44 @@
+#!/bin/sh /etc/rc.common
+# Copyright (C) 2008-2012 OpenWrt.org
+
+START=90
+USE_PROCD=1
+
+start_instance() {
+	local cfg="$1"
+	config_get type "$cfg" TYPE
+	case "$type" in
+	route)
+		local target mask gateway
+		config_get target "$cfg" 'target'
+		config_get mask "$cfg" 'mask'
+		config_get gateway "$cfg" 'gateway'
+		ip route add "$target/$mask" via "$gateway"
+	;;
+	esac
+}
+stop_instance() {
+	local cfg="$1"
+	config_get type "$cfg" TYPE
+	case "$type" in
+	route)
+		local target mask gateway
+		config_get target "$cfg" 'target'
+		config_get mask "$cfg" 'mask'
+		config_get gateway "$cfg" 'gateway'
+		ip route delete "$target/$mask" via "$gateway"
+	;;
+	esac
+}
+
+start_service() {
+	config_load 'openvpnroute'
+	( sleep 2; config_foreach start_instance 'route'; ) &
+}
+
+stop_service() {
+	config_load 'openvpnroute'
+	( sleep 2; config_foreach stop_instance 'route'; ) &
+}
+
+
