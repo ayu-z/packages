@@ -4,6 +4,27 @@
 START=90
 USE_PROCD=1
 
+netmask_to_cidr() {
+    mask=$1
+    cidr=0
+    set -- $(echo "$mask" | tr '.' ' ')
+    for octet; do
+        case $octet in
+            255) cidr=$((cidr + 8)) ;;
+            254) cidr=$((cidr + 7)) ;;
+            252) cidr=$((cidr + 6)) ;;
+            248) cidr=$((cidr + 5)) ;;
+            240) cidr=$((cidr + 4)) ;;
+            224) cidr=$((cidr + 3)) ;;
+            192) cidr=$((cidr + 2)) ;;
+            128) cidr=$((cidr + 1)) ;;
+            0)   cidr=$((cidr + 0)) ;;
+            *) echo "Invalid netmask: $mask" >&2; return 1 ;;
+        esac
+    done
+    echo "$cidr"
+}
+
 start_instance() {
 	local cfg="$1"
 	config_get type "$cfg" TYPE
@@ -14,6 +35,15 @@ start_instance() {
 		config_get mask "$cfg" 'mask'
 		config_get gateway "$cfg" 'gateway'
 		ip route add "$target/$mask" via "$gateway"
+		sleep 1
+        # ovpn_tun=$(uci get network.openvpn.ifname)
+		ovpn_tun="tap0"
+        netmask=`netmask_to_cidr $(uci get network.lan.netmask)`
+        lan_subnet=$(uci get network.lan.ipaddr)/${netmask}
+        iptables -A INPUT -i br-lan -p icmp --icmp-type echo-request -j ACCEPT
+        iptables -A FORWARD -i br-lan -o ${ovpn_tun} -j ACCEPT
+        iptables -A FORWARD -i ${ovpn_tun} -o br-lan -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+        iptables -t nat -A POSTROUTING -o ${ovpn_tun} -s ${lan_subnet} -j MASQUERADE
 	;;
 	esac
 }
